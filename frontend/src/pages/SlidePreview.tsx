@@ -115,6 +115,12 @@ const previewI18n = {
       confirmRegenerateAll: "将重新生成所有页面（历史记录将会保存），确定继续吗？",
       confirmRegenerateTitle: "确认重新生成",
       generationFailed: "生成失败",
+      qualityControl: "质量控制",
+      qualityControlDesc: "生成后先质检，通过才保存版本",
+      qualityControlOn: "已开启",
+      qualityControlOff: "已关闭",
+      qualityControlSaved: "质量控制设置已保存",
+      qualityControlSaveFailed: "质量控制设置保存失败",
       disabledExportTip: "本次导出范围还有 {{count}} 页未生成图片，请先生成图片或调整选择范围",
       messages: {
         exportSuccess: "导出成功", exportFailed: "导出失败",
@@ -237,6 +243,12 @@ const previewI18n = {
       confirmRegenerateAll: "Will regenerate all pages (history will be saved). Continue?",
       confirmRegenerateTitle: "Confirm Regenerate",
       generationFailed: "Generation failed",
+      qualityControl: "Quality Control",
+      qualityControlDesc: "Review after generation; save only passing versions",
+      qualityControlOn: "On",
+      qualityControlOff: "Off",
+      qualityControlSaved: "Quality control setting saved",
+      qualityControlSaveFailed: "Failed to save quality control setting",
       disabledExportTip: "{{count}} page(s) in this export range have no images yet. Generate images first or adjust the selection",
       messages: {
         exportSuccess: "Export successful", exportFailed: "Export failed",
@@ -273,6 +285,7 @@ import {
   FileText,
   Loader2,
   Info,
+  ShieldCheck,
 } from 'lucide-react';
 import { Button, Loading, Modal, Textarea, useToast, useConfirm, MaterialSelector, ProjectSettingsModal, ExportTasksPanel, TextStyleSelector } from '@/components/shared';
 import { MaterialGeneratorModal } from '@/components/shared/MaterialGeneratorModal';
@@ -284,7 +297,7 @@ import { SlideCard } from '@/components/preview/SlideCard';
 import { useProjectStore } from '@/store/useProjectStore';
 import { useExportTasksStore, type ExportTaskType } from '@/store/useExportTasksStore';
 import { getImageUrl } from '@/api/client';
-import { getPageImageVersions, setCurrentImageVersion, updateProject, uploadTemplate, exportPPTX as apiExportPPTX, exportPDF as apiExportPDF, exportImages as apiExportImages, exportEditablePPTX as apiExportEditablePPTX, exportVideo as apiExportVideo, getSettings, getElevenLabsVoices } from '@/api/endpoints';
+import { getPageImageVersions, setCurrentImageVersion, updateProject, uploadTemplate, exportPPTX as apiExportPPTX, exportPDF as apiExportPDF, exportImages as apiExportImages, exportEditablePPTX as apiExportEditablePPTX, exportVideo as apiExportVideo, getSettings, getElevenLabsVoices, updateSettings } from '@/api/endpoints';
 import type { ImageVersion, DescriptionContent, ExportExtractorMethod, ExportInpaintMethod, Page, NarrationConfig } from '@/types';
 import { normalizeErrorMessage } from '@/utils';
 
@@ -417,6 +430,8 @@ export const SlidePreview: React.FC = () => {
   const [elevenLabsVoices, setElevenLabsVoices] = useState<{ id: string; name: string; languages?: string[]; accent?: string | null }[]>([]);
   const [elevenLabsVoicesLoading, setElevenLabsVoicesLoading] = useState(false);
   const [outputLanguage, setOutputLanguage] = useState<string>('zh');
+  const [imageQualityControlEnabled, setImageQualityControlEnabled] = useState(false);
+  const [isSavingImageQualityControl, setIsSavingImageQualityControl] = useState(false);
   useEffect(() => { localStorage.setItem('elevenLabsEnabled', String(elevenLabsEnabled)); }, [elevenLabsEnabled]);
   useEffect(() => { if (elevenLabsVoiceId) localStorage.setItem('elevenLabsVoiceId', elevenLabsVoiceId); }, [elevenLabsVoiceId]);
   useEffect(() => { localStorage.setItem('videoSpeed', String(videoSpeed)); }, [videoSpeed]);
@@ -506,6 +521,42 @@ export const SlidePreview: React.FC = () => {
   const [selectionRect, setSelectionRect] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   const { show, ToastContainer } = useToast();
   const { confirm, ConfirmDialog } = useConfirm();
+
+  useEffect(() => {
+    const loadImageQualityControl = async () => {
+      try {
+        const response = await getSettings();
+        if (response.data) {
+          setImageQualityControlEnabled(Boolean(response.data.enable_image_quality_control));
+        }
+      } catch (error) {
+        console.error('Failed to load image quality control setting:', error);
+      }
+    };
+    loadImageQualityControl();
+  }, []);
+
+  const handleToggleImageQualityControl = useCallback(async () => {
+    const nextValue = !imageQualityControlEnabled;
+    setImageQualityControlEnabled(nextValue);
+    setIsSavingImageQualityControl(true);
+    try {
+      const response = await updateSettings({ enable_image_quality_control: nextValue });
+      if (response.data) {
+        setImageQualityControlEnabled(Boolean(response.data.enable_image_quality_control));
+        sessionStorage.setItem('banana-settings', JSON.stringify(response.data));
+      }
+      show({ message: t('preview.qualityControlSaved'), type: 'success' });
+    } catch (error: any) {
+      setImageQualityControlEnabled(!nextValue);
+      show({
+        message: `${t('preview.qualityControlSaveFailed')}: ${error?.response?.data?.error?.message || error?.message || t('slidePreview.unknownError')}`,
+        type: 'error',
+      });
+    } finally {
+      setIsSavingImageQualityControl(false);
+    }
+  }, [imageQualityControlEnabled, show, t]);
 
 
   // Memoize pages with generated images to avoid re-computing in multiple places
@@ -2220,6 +2271,36 @@ export const SlidePreview: React.FC = () => {
                 ? t('preview.generateSelected', { count: selectedPageIds.size })
                 : t('preview.batchGenerate', { count: currentProject.pages.length })}
             </Button>
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 dark:border-border-primary bg-gray-50 dark:bg-background-tertiary px-3 py-2">
+              <div className="min-w-0 flex items-start gap-2">
+                <ShieldCheck size={16} className="mt-0.5 flex-shrink-0 text-banana-600 dark:text-banana-300" />
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-gray-800 dark:text-foreground-primary">
+                    {t('preview.qualityControl')}
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-foreground-tertiary">
+                    {imageQualityControlEnabled ? t('preview.qualityControlOn') : t('preview.qualityControlOff')} · {t('preview.qualityControlDesc')}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={imageQualityControlEnabled}
+                aria-label={t('preview.qualityControl')}
+                onClick={handleToggleImageQualityControl}
+                disabled={isSavingImageQualityControl}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-banana-500 focus:ring-offset-2 disabled:opacity-60 ${
+                  imageQualityControlEnabled ? 'bg-banana-500' : 'bg-gray-300 dark:bg-background-hover'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    imageQualityControlEnabled ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
           </div>
           
           {/* 缩略图列表：桌面端垂直，移动端横向滚动 */}
