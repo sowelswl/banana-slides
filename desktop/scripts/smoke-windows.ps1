@@ -126,6 +126,7 @@ Write-Step "AppExe=$($appExe.FullName)"
 $env:BANANA_DESKTOP_SMOKE = "1"
 $env:BANANA_DESKTOP_SMOKE_RESULT = $resultPath
 $env:BANANA_DESKTOP_SMOKE_SCREENSHOT = $screenshotPath
+$env:BANANA_DESKTOP_SMOKE_QUIT_DELAY_MS = "60000"
 
 Write-Step "Launching installed app"
 $app = Start-Process -FilePath $appExe.FullName -PassThru

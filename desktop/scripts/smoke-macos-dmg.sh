@@ -57,6 +57,7 @@ app_exe="$installed_app/Contents/MacOS/Banana Slides"
 export BANANA_DESKTOP_SMOKE=1
 export BANANA_DESKTOP_SMOKE_RESULT="$result_path"
 export BANANA_DESKTOP_SMOKE_SCREENSHOT="$screenshot_path"
+export BANANA_DESKTOP_SMOKE_QUIT_DELAY_MS=60000
 
 log "Launching app executable"
 "$app_exe" >> "$out_dir/app-stdout.log" 2>> "$out_dir/app-stderr.log" &
