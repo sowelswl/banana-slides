@@ -73,19 +73,28 @@ function assertCommandSucceeded(result, command) {
   throw new Error(`${command} failed${details ? `:\n${details}` : ''}`);
 }
 
+function readBmpPixels(filePath) {
+  const data = fs.readFileSync(filePath);
+  assert.equal(data.subarray(0, 2).toString('ascii'), 'BM', `${filePath} is not a BMP file`);
+  const pixelOffset = data.readUInt32LE(10);
+  assert.ok(pixelOffset >= 14 && pixelOffset < data.length, `${filePath} has an invalid pixel offset`);
+  return data.subarray(pixelOffset);
+}
+
 function assertMacIcnsMatchesMaster(masterPath, icnsPath) {
   if (process.platform !== 'darwin') return;
 
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'banana-icon-contract-'));
   const iconsetPath = path.join(tempDir, 'icon.iconset');
-  const expectedPath = path.join(tempDir, 'expected-1024.png');
+  const masterBmpPath = path.join(tempDir, 'master.bmp');
+  const bundledBmpPath = path.join(tempDir, 'bundled.bmp');
   try {
-    const resize = spawnSync(
+    const convertMaster = spawnSync(
       'sips',
-      ['-z', '1024', '1024', masterPath, '--out', expectedPath],
+      ['-s', 'format', 'bmp', masterPath, '--out', masterBmpPath],
       { encoding: 'utf8' },
     );
-    assertCommandSucceeded(resize, 'sips');
+    assertCommandSucceeded(convertMaster, 'sips');
 
     const extract = spawnSync(
       'iconutil',
@@ -95,8 +104,15 @@ function assertMacIcnsMatchesMaster(masterPath, icnsPath) {
     assertCommandSucceeded(extract, 'iconutil');
 
     const bundled1024 = path.join(iconsetPath, 'icon_512x512@2x.png');
-    assert.ok(fs.readFileSync(bundled1024).equals(fs.readFileSync(expectedPath)),
-      'icon.icns must be regenerated from resources/icon.png');
+    const convertBundled = spawnSync(
+      'sips',
+      ['-s', 'format', 'bmp', bundled1024, '--out', bundledBmpPath],
+      { encoding: 'utf8' },
+    );
+    assertCommandSucceeded(convertBundled, 'sips');
+
+    assert.ok(readBmpPixels(masterBmpPath).equals(readBmpPixels(bundledBmpPath)),
+      'icon.icns pixels must match resources/icon.png');
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
@@ -128,6 +144,10 @@ function checkIconContract(rootDir = desktopDir) {
   assert.ok(!fs.existsSync(path.join(rootDir, 'logo.png')), 'Remove the legacy desktop/logo.png asset');
 
   const builder = fs.readFileSync(builderPath, 'utf8');
+  const filesSection = readTopLevelYamlSection(builder, 'files');
+  assert.ok(!filesSection.includes('resources/icon.icns'), 'Do not duplicate icon.icns inside app.asar');
+  assert.ok(!filesSection.includes('resources/icon.ico'), 'Do not duplicate icon.ico inside app.asar');
+  assert.ok(filesSection.includes('resources/icon.png'), 'Splash icon must be packaged inside app.asar');
   const macSection = readTopLevelYamlSection(builder, 'mac');
   assert.match(macSection, /^\s{2}icon: resources\/icon\.icns$/m,
     'mac.icon must use resources/icon.icns');
@@ -141,7 +161,7 @@ function checkIconContract(rootDir = desktopDir) {
   const main = fs.readFileSync(mainPath, 'utf8');
   assert.match(
     main,
-    /if \(shouldSetDockIcon\([\s\S]{0,160}\)\) \{\s*app\.dock\.setIcon\(getIconPath\(\)\);/,
+    /if \(app\.dock && shouldSetDockIcon\([\s\S]{0,160}\)\) \{\s*app\.dock\.setIcon\(getIconPath\(\)\);/,
     'main.js must gate the Dock override behind the development-only icon policy',
   );
   assert.match(

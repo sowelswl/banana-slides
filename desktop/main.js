@@ -171,7 +171,7 @@ function createMainWindow() {
     },
   });
 
-  if (shouldSetDockIcon({ platform: process.platform, isPackaged: app.isPackaged })) {
+  if (app.dock && shouldSetDockIcon({ platform: process.platform, isPackaged: app.isPackaged })) {
     app.dock.setIcon(getIconPath());
     runtimeIconState.dockOverrideApplied = true;
   }
