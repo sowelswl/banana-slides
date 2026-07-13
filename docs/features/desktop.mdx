@@ -21,6 +21,10 @@ Download the installer for your platform from [GitHub Releases](https://github.c
 
 The desktop app stores its database, uploads, materials, and exports in a user-writable app data directory rather than in packaged resource directories. Back up important local projects before upgrading.
 
+Desktop installers do not include the project-root `.env` used by source deployments. Configure the API provider, base URL, models, and API key on the in-app **Settings** page instead; these settings persist in the local database under the app data directory. An independent provider configured for a model takes precedence over the **Default API Configuration** above it. If a service test shows an unexpected provider (for example, MiniMax after you configured Gemini), click **Use default for all models** in the model configuration section, save, and test again.
+
+After a successful export in the web app, the file is saved to the browser's default download directory. The desktop app opens the system save dialog instead. On both platforms, you can download previously exported files again from the **Export Tasks** panel on the preview page.
+
 ## Local Packaging Requirements
 
 Local packaging needs frontend, backend, and Electron dependencies:
@@ -136,6 +140,14 @@ macOS verification should cover at least:
 ### The App Says the Backend Is Unavailable
 
 Confirm the installer includes `desktop/backend/`, and check whether security software blocked the bundled backend process. During development or packaging verification, also confirm PyInstaller generated `backend/dist/banana-backend/`.
+
+### Gemini Is Configured but Another Provider Is Shown
+
+The text generation, image generation, and image captioning models can each use an independent provider; these independent settings override the default API. Return to **Settings → Model Configuration**, check the yellow override notice, click **Use default for all models**, save, and rerun the service test. The desktop app does not need or create a `.env` file in its installation directory.
+
+### A Web Export Succeeded but the File Is Missing
+
+Check the browser's default download directory and download history first. You can also open the **Export Tasks** panel on the preview page after the export finishes and click **Download** for the corresponding file. If the browser restricts download permissions, allow downloads for the current site and try again.
 
 ### Packaging Cannot Find Frontend or Backend Resources
 
