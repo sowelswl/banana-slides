@@ -805,7 +805,7 @@ export const Settings: React.FC = () => {
           show({ message: t('settings.openaiOAuth.callbackPortBusy'), type: 'warning' });
         }
         const popup = window.open(resp.data.auth_url, 'openai-oauth', 'width=600,height=700');
-        if (!popup && !isDesktop) {
+        if ((!popup || popup.closed) && !isDesktop) {
           setOauthConnecting(false);
           show({ message: t('settings.openaiOAuth.popupBlocked'), type: 'error' });
           return;

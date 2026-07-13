@@ -61,16 +61,18 @@ export function startOpenAIOAuthMonitor({
   const checkStatus = async () => {
     if (stopped || checking) return;
     checking = true;
+    let status: OpenAIOAuthStatus | null = null;
     try {
-      const status = await getStatus();
-      if (!stopped && status?.connected) {
-        stop();
-        onConnected(status);
-      }
+      status = await getStatus();
     } catch {
       // Transient status failures are retried until the OAuth deadline.
     } finally {
       checking = false;
+    }
+
+    if (!stopped && status?.connected) {
+      stop();
+      onConnected(status);
     }
   };
 

@@ -300,6 +300,35 @@ test.describe('OpenAI OAuth Settings Section', () => {
       await expect(page.getByRole('button', { name: 'Login with OpenAI' })).toBeEnabled();
     });
 
+    test('immediately closed web popup is treated as blocked', async ({ page }) => {
+      const base = await getBaseSettings();
+
+      await page.route('**/api/settings', async (route) => {
+        if (route.request().method() === 'GET') {
+          await route.fulfill({
+            json: { success: true, data: { ...base, openai_oauth_connected: false, openai_oauth_account_id: null } },
+          });
+        } else {
+          await route.continue();
+        }
+      });
+      await page.route('**/api/settings/openai-oauth/authorize', async (route) => {
+        await route.fulfill({
+          json: { success: true, data: { auth_url: 'https://auth.openai.com/oauth/authorize?client_id=test' } },
+        });
+      });
+
+      await page.goto(`${BASE_URL}/settings`);
+      await expandAdvancedSettings(page);
+      await page.evaluate(() => {
+        window.open = () => ({ closed: true }) as Window;
+      });
+      await page.getByRole('button', { name: 'Login with OpenAI' }).click();
+
+      await expect(page.getByText(/登录窗口被浏览器拦截|login window was blocked/i)).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Login with OpenAI' })).toBeEnabled();
+    });
+
     test('should auto-open manual callback when localhost callback port is unavailable', async ({ page }) => {
       const base = await getBaseSettings();
 
