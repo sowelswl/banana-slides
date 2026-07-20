@@ -1,6 +1,6 @@
 import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, FileText, Sparkles, Download, Upload, ChevronDown, Settings2, X, Plus, HelpCircle, ImageIcon, Layers, LayoutTemplate } from 'lucide-react';
+import { ArrowLeft, ArrowRight, FileText, Sparkles, Download, Upload, ChevronDown, Settings2, X, Plus, HelpCircle, ImageIcon, Layers } from 'lucide-react';
 import logoUrl from '@/assets/logo.png';
 import { useT } from '@/hooks/useT';
 import { MarkdownTextarea, type MarkdownTextareaRef } from '@/components/shared/MarkdownTextarea';
@@ -665,18 +665,7 @@ export const DetailEditor: React.FC = () => {
             >
               <span className="hidden lg:inline">{t('common.previous')}</span>
             </Button>
-            {currentProject.template_mode === 'multi' ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                icon={<LayoutTemplate size={16} className="md:w-[18px] md:h-[18px]" />}
-                onClick={() => navigate(`/project/${projectId}/template-setup`)}
-                disabled={isRenovationProcessing}
-                className="hidden md:inline-flex"
-              >
-                <span className="hidden lg:inline">{t('detail.toTemplateSetup')}</span>
-              </Button>
-            ) : (
+            {currentProject.template_mode !== 'multi' && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -688,6 +677,7 @@ export const DetailEditor: React.FC = () => {
                 <span className="hidden lg:inline">{t('detail.toMultiTemplate')}</span>
               </Button>
             )}
+            {/* multi 模式下一步是模板配置（生成在预览页发生），文案与去向保持一致 */}
             <Button
               variant="primary"
               size="sm"
@@ -703,7 +693,11 @@ export const DetailEditor: React.FC = () => {
               title={!hasAllDescriptions && !isRenovationProcessing ? t('detail.disabledNextTip', { count: missingDescCount }) : undefined}
               className="text-xs md:text-sm"
             >
-              <span className="hidden sm:inline">{t('detail.generateImages')}</span>
+              <span className="hidden sm:inline">
+                {currentProject.template_mode === 'multi'
+                  ? t('detail.toTemplateSetup')
+                  : t('detail.generateImages')}
+              </span>
             </Button>
           </div>
         </div>
