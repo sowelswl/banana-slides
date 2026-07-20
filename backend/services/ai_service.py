@@ -1233,19 +1233,20 @@ class AIService:
                            project_context: ProjectContext,
                            outline: List[Dict] = None,
                            previous_requirements: Optional[List[str]] = None,
-                           language='zh') -> List[str]:
+                           language='zh') -> List[Dict]:
         """
         根据用户要求修改已有页面描述
-        
+
         Args:
             current_descriptions: 当前的页面描述列表，每个元素包含 {index, title, description_content}
             user_requirement: 用户的新要求
             project_context: 项目上下文对象，包含所有原始信息
             outline: 完整的大纲结构（可选）
             previous_requirements: 之前的修改要求列表（可选）
-        
+
         Returns:
-            修改后的页面描述列表（字符串列表）
+            修改后的页面描述列表，每个元素为 {'text': ..., 'extra_fields': {...}}。
+            额外字段必须切分出来，否则字段行会被当作页面文字渲染到幻灯片上。
         """
         refinement_prompt = get_descriptions_refinement_prompt(
             current_descriptions=current_descriptions,
@@ -1257,11 +1258,22 @@ class AIService:
         )
         descriptions = self.generate_json(refinement_prompt, thinking_budget=1000)
 
-        # 确保返回的是字符串列表
-        if isinstance(descriptions, list):
-            return [str(desc) for desc in descriptions]
-        else:
+        if not isinstance(descriptions, list):
             raise ValueError("Expected a list of page descriptions, but got: " + str(type(descriptions)))
+
+        # 当前配置字段 + 存量数据里的旧字段名，都要能被切分出来
+        from models import Settings
+        field_names = list(dict.fromkeys(
+            [*self._get_extra_field_names(), *Settings.LEGACY_FIELD_EQUIV.keys()]
+        ))
+        results = []
+        for desc in descriptions:
+            text, extra_fields = self._parse_extra_fields(str(desc), field_names)
+            result = {'text': text}
+            if extra_fields:
+                result['extra_fields'] = extra_fields
+            results.append(result)
+        return results
 
     def extract_page_content(self, markdown_text: str, language: str = 'zh') -> Dict:
         """
